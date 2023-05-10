@@ -17,50 +17,54 @@ public class ConstituencyApiCaller {
     private final OkHttpClient client = new OkHttpClient();
     private final ObjectMapper mapper = new ObjectMapper();
 
-    public void callApiAndSaveIdsToFile() throws IOException {
-        FileWriter writer = new FileWriter(FILENAME);
+   public void callApiAndSaveIdsToFile() throws IOException, InterruptedException {
+    FileWriter writer = new FileWriter(FILENAME);
 
-        for (int id = 1; id <= MAX_ID; id++) {
-            String apiUrl = String.format(API_URL_TEMPLATE, id);
-            Request request = new Request.Builder().url(apiUrl).build();
+    for (int id = 1; id <= MAX_ID; id++) {
+        String apiUrl = String.format(API_URL_TEMPLATE, id);
+        Request request = new Request.Builder().url(apiUrl).build();
 
-            try (Response response = client.newCall(request).execute()) {
-                if (response.isSuccessful()) {
-                    String responseBody = response.body().string();
-                    System.out.printf("Received response for ID %d: %s\n", id, responseBody);
-                    JsonNode jsonNode = mapper.readTree(responseBody);
+        try (Response response = client.newCall(request).execute()) {
+            if (response.isSuccessful()) {
+                String responseBody = response.body().string();
+                System.out.printf("Received response for ID %d: %s\n", id, responseBody);
+                JsonNode jsonNode = mapper.readTree(responseBody);
 
-                    if (jsonNode.has("value")) {
-                        JsonNode valueNode = jsonNode.get("value");
+                if (jsonNode.has("value")) {
+                    JsonNode valueNode = jsonNode.get("value");
 
-                        if (valueNode.has("currentRepresentation")) {
-                            JsonNode currentRepresentationNode = valueNode.get("currentRepresentation");
+                    if (valueNode.has("currentRepresentation")) {
+                        JsonNode currentRepresentationNode = valueNode.get("currentRepresentation");
 
-                            if (currentRepresentationNode.has("member")) {
-                                JsonNode memberNode = currentRepresentationNode.get("member");
+                        if (currentRepresentationNode.has("member")) {
+                            JsonNode memberNode = currentRepresentationNode.get("member");
 
-                                if (memberNode.has("value") && memberNode.get("value").has("nameListAs")) {
-                                    String memberName = memberNode.get("value").get("nameListAs").asText();
-                                    System.out.printf("ID %d: Member name found: %s\n", id, memberName);
-                                    writer.write(String.format("%d,%s,%s\n", id, memberName, responseBody));
-                                } else {
-                                    System.out.printf("ID %d: Member name not found\n", id);
-                                }
+                            if (memberNode.has("value") && memberNode.get("value").has("nameListAs")) {
+                                String memberName = memberNode.get("value").get("nameListAs").asText();
+                                System.out.printf("ID %d: Member name found: %s\n", id, memberName);
+                                String gender = memberNode.get("value").get("gender").asText();
+                                String membershipStartDate = memberNode.get("value").get("latestHouseMembership").get("membershipStartDate").asText();
+                                writer.write(String.format("%d,%s,%s,%s\n", id, memberName, gender, membershipStartDate));
+                                writer.flush();  // flush the writer to ensure the data is written to disk
+                                Thread.sleep(500);  // wait for 0.5 seconds
                             } else {
-                                System.out.printf("ID %d: Member object not found\n", id);
+                                System.out.printf("ID %d: Member name not found\n", id);
                             }
                         } else {
-                            System.out.printf("ID %d: Current representation object not found\n", id);
+                            System.out.printf("ID %d: Member object not found\n", id);
                         }
                     } else {
-                        System.out.printf("ID %d: Value object not found\n", id);
+                        System.out.printf("ID %d: Current representation object not found\n", id);
                     }
                 } else {
-                    System.out.printf("Request for ID %d failed: %d %s\n", id, response.code(), response.message());
+                    System.out.printf("ID %d: Value object not found\n", id);
                 }
+            } else {
+                System.out.printf("Request for ID %d failed: %d %s\n", id, response.code(), response.message());
             }
         }
-
-        writer.close();
     }
+
+    writer.close();
+}
 }
